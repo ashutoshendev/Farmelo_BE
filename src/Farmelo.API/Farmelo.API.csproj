@@ -30,7 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Templates\Invoices\INV011.pdf" CopyToOutputDirectory="PreserveNewest" />
+    <Folder Include="Templates\Invoices\" />
   </ItemGroup>
 
 </Project>
