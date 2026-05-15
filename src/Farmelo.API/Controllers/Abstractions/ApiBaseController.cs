@@ -35,4 +35,10 @@ public abstract class ApiBaseController<T> : ControllerBase
 
     protected BadRequestObjectResult FailureResult<TResponse>(string error)
         => BadRequest(ServiceOperationResult.CreateWithFailure<TResponse>(error));
+
+    protected BadRequestObjectResult MissingBodyResult<TResponse>()
+        => FailureResult<TResponse>("Request body is required.");
+
+    protected BadRequestObjectResult InvalidRouteIdResult<TResponse>(string routeParameterName)
+        => FailureResult<TResponse>($"{routeParameterName} must be greater than zero.");
 }

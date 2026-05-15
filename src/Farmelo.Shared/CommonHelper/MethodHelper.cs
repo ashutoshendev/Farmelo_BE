@@ -66,7 +66,15 @@ public static class MethodHelper
 
             return Encoding.UTF8.GetString(target.ToArray());
         }
-        catch (Exception)
+        catch (FormatException)
+        {
+            return stringToBeUnZipped;
+        }
+        catch (InvalidDataException)
+        {
+            return stringToBeUnZipped;
+        }
+        catch (IOException)
         {
             return stringToBeUnZipped;
         }

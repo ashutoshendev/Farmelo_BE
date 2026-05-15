@@ -1,4 +1,8 @@
 using Farmelo.API.ApiUtils;
+using Farmelo.API.Auditing;
+using Farmelo.API.Services.Invoices;
+using Farmelo.Business.Services.Invoices;
+using Farmelo.Business.Services.Security;
 using Farmelo.Data.Connections;
 using Farmelo.Data.Extensions;
 using Farmelo.Data.Read.Infrastructure;
@@ -9,15 +13,13 @@ using Farmelo.Data.Write.Repository;
 using Farmelo.Shared.CommonHelper;
 using Farmelo.Shared.Config;
 using FluentValidation;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Farmelo.API.DI;
 
 public static class DependencyInjector
 {
-    private const string LocalDbFallbackConnectionString =
-        "Server=(localdb)\\MSSQLLocalDB;Database=Farmelo;Trusted_Connection=True;TrustServerCertificate=True;";
-
     public static void RegisterServices(IServiceCollection services, ConfigurationOptions config)
     {
         RegisterRepositories(services);
@@ -46,6 +48,16 @@ public static class DependencyInjector
     private static void RegisterRepositories(IServiceCollection services)
     {
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+        services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddSingleton<IAuditEventQueue, AuditEventQueue>();
+        services.AddScoped<IAuditLogger, AuditLogger>();
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuditCommandBehavior<,>));
+        services.AddHostedService<AuditLogBackgroundService>();
+        services.AddSingleton<IApiLogQueue, ApiLogQueue>();
+        services.AddHostedService<ApiLogBackgroundService>();
+        services.AddHostedService<ApiLogPurgeService>();
+        services.AddScoped<IInvoiceEmailSender, SmtpInvoiceEmailSender>();
+        services.AddScoped<IInvoiceService, InvoiceService>();
     }
 
     private static void RegisterModelValidators(IServiceCollection services)
@@ -80,11 +92,12 @@ public static class DependencyInjector
         var configured = config.ConnectionStrings.DatabaseConnection;
         var resolved = MethodHelper.Unzip(configured);
 
-        if (!string.IsNullOrWhiteSpace(resolved))
+        if (string.IsNullOrWhiteSpace(resolved))
         {
-            return resolved;
+            throw new InvalidOperationException(
+                "ConnectionStrings:DatabaseConnection is required. Configure it in appsettings or environment-specific configuration.");
         }
 
-        return LocalDbFallbackConnectionString;
+        return resolved;
     }
 }

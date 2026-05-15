@@ -4,13 +4,9 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Farmelo.API.ActionFilters;
 
-public sealed class ModelStateFilter : IActionFilter
+public sealed class ModelStateFilter : ActionFilterAttribute
 {
-    public void OnActionExecuted(ActionExecutedContext context)
-    {
-    }
-
-    public void OnActionExecuting(ActionExecutingContext context)
+    public override void OnActionExecuting(ActionExecutingContext context)
     {
         if (context.ModelState.IsValid)
         {

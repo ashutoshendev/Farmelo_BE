@@ -67,6 +67,9 @@ public static class ApiHelper
     internal static string GetUserNameFromClaims(HttpContext httpContext)
         => GetClaimValue(httpContext, ClaimTypes.Name, "name", "username", "email") ?? string.Empty;
 
+    internal static string GetUserRoleFromClaims(HttpContext httpContext)
+        => GetClaimValue(httpContext, ClaimTypes.Role, "role") ?? string.Empty;
+
     private static string? GetClaimValue(HttpContext httpContext, params string[] claimTypes)
     {
         foreach (var claimType in claimTypes)

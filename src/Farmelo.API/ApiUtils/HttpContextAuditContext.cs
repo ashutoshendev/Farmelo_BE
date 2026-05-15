@@ -21,6 +21,11 @@ public sealed class HttpContextAuditContext : ICurrentUser, IAuditContext
             ? string.Empty
             : ApiHelper.GetUserNameFromClaims(_httpContextAccessor.HttpContext);
 
+    public string UserRole
+        => _httpContextAccessor.HttpContext == null
+            ? string.Empty
+            : ApiHelper.GetUserRoleFromClaims(_httpContextAccessor.HttpContext);
+
     public string? Endpoint
     {
         get

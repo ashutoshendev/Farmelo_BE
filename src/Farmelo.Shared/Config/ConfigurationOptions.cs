@@ -10,6 +10,8 @@ public class ConfigurationOptions
     public AuditLogs AuditLogs { get; set; } = new();
     public AuthOptions AuthOptions { get; set; } = new();
     public FileStorageOptions FileStorage { get; set; } = new();
+    public InvoiceOptions Invoices { get; set; } = new();
+    public EmailOptions Email { get; set; } = new();
 }
 
 public class ConnectionStrings
@@ -56,6 +58,27 @@ public class AuthOptions
 public class FileStorageOptions
 {
     public string RootPath { get; set; } = string.Empty;
+}
+
+public class InvoiceOptions
+{
+    public string FirmName { get; set; } = "Kaj International";
+    public string TemplatePath { get; set; } = string.Empty;
+    public string OutputPath { get; set; } = string.Empty;
+    public string NumberPrefix { get; set; } = "KAJ";
+    public string DownloadBaseUrl { get; set; } = "/api/invoices";
+    public string[] Recipients { get; set; } = Array.Empty<string>();
+}
+
+public class EmailOptions
+{
+    public string Host { get; set; } = string.Empty;
+    public int Port { get; set; } = 587;
+    public bool EnableSsl { get; set; } = true;
+    public string UserName { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string FromEmail { get; set; } = string.Empty;
+    public string FromName { get; set; } = "Kaj International";
 }
 
 public class SystemApi : BaseApiSettings

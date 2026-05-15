@@ -1,14 +1,18 @@
 using Farmelo.API.ActionFilters;
 using Farmelo.API.DI;
 using Farmelo.API.Middleware;
+using Farmelo.Data.Write.EFContext;
 using Farmelo.Shared.Config;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using NLog;
 using NLog.Web;
 using System.Net;
+using System.Security.Claims;
 
 var logger = LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
 logger.Debug("init main");
@@ -71,6 +75,27 @@ try
             options.SlidingExpiration = config.AuthOptions.SlidingExpiration;
             options.Events = new CookieAuthenticationEvents
             {
+                OnValidatePrincipal = async context =>
+                {
+                    var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                    if (!int.TryParse(userIdValue, out var userId))
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        return;
+                    }
+
+                    var dbContext = context.HttpContext.RequestServices.GetRequiredService<FarmeloDbContext>();
+                    var userIsActive = await dbContext.UserAccounts
+                        .AsNoTracking()
+                        .AnyAsync(user => user.Id == userId && user.IsActive, context.HttpContext.RequestAborted);
+
+                    if (!userIsActive)
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    }
+                },
                 OnRedirectToLogin = context =>
                 {
                     context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
@@ -117,6 +142,7 @@ try
     app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseMiddleware<DecodeUrlMiddleware>();
     app.UseAuthentication();
+    app.UseMiddleware<ApiLoggingMiddleware>();
     app.UseAuthorization();
     app.MapControllers();
 
