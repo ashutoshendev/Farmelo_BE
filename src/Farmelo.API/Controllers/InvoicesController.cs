@@ -47,4 +47,18 @@ public sealed class InvoicesController : ApiBaseController<InvoicesController>
         var bytes = await System.IO.File.ReadAllBytesAsync(invoice.PdfPath, ct);
         return File(bytes, "application/pdf", invoice.PdfFileName ?? $"{invoice.InvoiceNumber.Replace('/', '-')}.pdf");
     }
+
+    [HttpPost("{invoiceId:long}/send")]
+    public async Task<IActionResult> Send(long invoiceId, CancellationToken ct)
+    {
+        if (invoiceId <= 0)
+        {
+            return BadRequest("invoiceId must be greater than zero.");
+        }
+
+        var invoice = await _invoiceService.SendNotificationsAsync(invoiceId, ct);
+        return invoice == null
+            ? NotFound("Invoice was not found.")
+            : Ok(invoice);
+    }
 }

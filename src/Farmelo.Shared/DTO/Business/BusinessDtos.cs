@@ -211,6 +211,7 @@ public sealed class BusinessDashboardDto
 {
     public decimal RawStockKg { get; set; }
     public int TotalBoxStock { get; set; }
+    public decimal SupplierPayable { get; set; }
     public decimal TotalReceivable { get; set; }
     public decimal CollectedThisMonth { get; set; }
     public decimal PendingPayments { get; set; }

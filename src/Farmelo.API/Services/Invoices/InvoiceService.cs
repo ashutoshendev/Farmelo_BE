@@ -17,6 +17,7 @@ public sealed class InvoiceService : IInvoiceService
     private readonly FarmeloDbContext _dbContext;
     private readonly ConfigurationOptions _config;
     private readonly IInvoiceEmailSender _emailSender;
+    private readonly IInvoiceWhatsAppSender _whatsAppSender;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<InvoiceService> _logger;
 
@@ -24,12 +25,14 @@ public sealed class InvoiceService : IInvoiceService
         FarmeloDbContext dbContext,
         ConfigurationOptions config,
         IInvoiceEmailSender emailSender,
+        IInvoiceWhatsAppSender whatsAppSender,
         IWebHostEnvironment environment,
         ILogger<InvoiceService> logger)
     {
         _dbContext = dbContext;
         _config = config;
         _emailSender = emailSender;
+        _whatsAppSender = whatsAppSender;
         _environment = environment;
         _logger = logger;
     }
@@ -135,7 +138,13 @@ public sealed class InvoiceService : IInvoiceService
         }
     }
 
-    public async Task<InvoiceDto?> RegeneratePdfAsync(long invoiceId, CancellationToken cancellationToken)
+    public Task<InvoiceDto?> RegeneratePdfAsync(long invoiceId, CancellationToken cancellationToken)
+        => RegenerateAsync(invoiceId, false, cancellationToken);
+
+    public Task<InvoiceDto?> SendNotificationsAsync(long invoiceId, CancellationToken cancellationToken)
+        => RegenerateAsync(invoiceId, true, cancellationToken);
+
+    private async Task<InvoiceDto?> RegenerateAsync(long invoiceId, bool sendNotifications, CancellationToken cancellationToken)
     {
         try
         {
@@ -171,7 +180,7 @@ public sealed class InvoiceService : IInvoiceService
                     order.Order.PricePerKg,
                     order.Order.TotalValue);
                 var party = new PartyInvoiceInfo(order.PartyName, order.ContactName, order.PartyEmail, order.Location, order.Phone);
-                await GenerateAndSendAsync(invoice, party, [item], false, cancellationToken);
+                await GenerateAndSendAsync(invoice, party, [item], sendNotifications, cancellationToken);
                 return ToInvoiceDto(invoice, order.PartyName);
             }
 
@@ -206,7 +215,7 @@ public sealed class InvoiceService : IInvoiceService
                     assignment.PartyEmail,
                     assignment.Location,
                     assignment.Phone);
-                await GenerateAndSendAsync(invoice, party, [item], false, cancellationToken);
+                await GenerateAndSendAsync(invoice, party, [item], sendNotifications, cancellationToken);
                 return ToInvoiceDto(invoice, assignment.PartyName);
             }
 
@@ -214,7 +223,7 @@ public sealed class InvoiceService : IInvoiceService
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
-            _logger.LogWarning(ex, "Invoice regeneration failed for invoice {InvoiceId}", invoiceId);
+            _logger.LogWarning(ex, "Invoice regeneration or notification failed for invoice {InvoiceId}", invoiceId);
             return null;
         }
     }
@@ -293,6 +302,15 @@ public sealed class InvoiceService : IInvoiceService
             invoice.EmailStatus = emailResult.Success ? "Sent" : "Failed";
             invoice.EmailError = emailResult.Error;
             invoice.EmailSentOn = emailResult.Success ? DateTime.UtcNow : null;
+
+            var whatsAppResult = await _whatsAppSender.SendInvoiceAsync(invoice, party.Name, party.Phone, invoice.PdfPath, cancellationToken);
+            if (!whatsAppResult.Skipped && !whatsAppResult.Success)
+            {
+                _logger.LogWarning(
+                    "Invoice WhatsApp notification failed for {InvoiceNumber}: {Error}",
+                    invoice.InvoiceNumber,
+                    whatsAppResult.Error);
+            }
         }
 
         invoice.ModifiedBy = "SYSTEM";
