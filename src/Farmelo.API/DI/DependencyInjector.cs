@@ -1,6 +1,8 @@
 using Farmelo.API.ApiUtils;
 using Farmelo.API.Auditing;
+using Farmelo.API.Services.Auth;
 using Farmelo.API.Services.Invoices;
+using Farmelo.API.Services.Notifications;
 using Farmelo.Business.Services.Invoices;
 using Farmelo.Business.Services.Security;
 using Farmelo.Data.Connections;
@@ -57,7 +59,10 @@ public static class DependencyInjector
         services.AddHostedService<ApiLogBackgroundService>();
         services.AddHostedService<ApiLogPurgeService>();
         services.AddScoped<IInvoiceEmailSender, SmtpInvoiceEmailSender>();
+        services.AddHttpClient<IInvoiceWhatsAppSender, MetaWhatsAppInvoiceSender>();
+        services.AddHttpClient<IInquiryNotificationService, InquiryNotificationService>();
         services.AddScoped<IInvoiceService, InvoiceService>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
     }
 
     private static void RegisterModelValidators(IServiceCollection services)

@@ -1,17 +1,17 @@
 using Farmelo.API.ActionFilters;
 using Farmelo.API.DI;
 using Farmelo.API.Middleware;
+using Farmelo.API.Services.Auth;
 using Farmelo.Data.Write.EFContext;
 using Farmelo.Shared.Config;
 using FluentValidation.AspNetCore;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using NLog;
 using NLog.Web;
-using System.Net;
 using System.Security.Claims;
 
 var logger = LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
@@ -32,11 +32,10 @@ try
             if (string.IsNullOrWhiteSpace(allowedOrigins) || allowedOrigins == "*")
             {
                 policy
-                    .SetIsOriginAllowed(_ => true)
+                    .AllowAnyOrigin()
                     .AllowAnyMethod()
                     .AllowAnyHeader()
-                    .WithExposedHeaders(exposedHeaders)
-                    .AllowCredentials();
+                    .WithExposedHeaders(exposedHeaders);
             }
             else
             {
@@ -44,8 +43,7 @@ try
                     .WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                     .AllowAnyMethod()
                     .AllowAnyHeader()
-                    .WithExposedHeaders(exposedHeaders)
-                    .AllowCredentials();
+                    .WithExposedHeaders(exposedHeaders);
             }
         });
     });
@@ -55,33 +53,32 @@ try
         .AddNewtonsoftJson();
 
     builder.Services
-        .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-        .AddCookie(options =>
+        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
         {
-            options.Cookie.Name = string.IsNullOrWhiteSpace(config.AuthOptions.CookieName)
-                ? "Farmelo.Auth"
-                : config.AuthOptions.CookieName;
-            options.Cookie.HttpOnly = true;
-            options.Cookie.SecurePolicy = config.AuthOptions.RequireHttps
-                ? CookieSecurePolicy.Always
-                : CookieSecurePolicy.SameAsRequest;
-            options.Cookie.SameSite = config.AuthOptions.SameSite?.Trim().ToUpperInvariant() switch
+            options.TokenValidationParameters = new TokenValidationParameters
             {
-                "STRICT" => SameSiteMode.Strict,
-                "NONE" => SameSiteMode.None,
-                _ => SameSiteMode.Lax
+                ValidateIssuer = true,
+                ValidIssuer = JwtTokenOptions.GetIssuer(config.AuthOptions),
+                ValidateAudience = true,
+                ValidAudience = JwtTokenOptions.GetAudience(config.AuthOptions),
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = JwtTokenOptions.CreateSigningKey(config.AuthOptions),
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(2),
+                NameClaimType = ClaimTypes.Name,
+                RoleClaimType = ClaimTypes.Role
             };
-            options.ExpireTimeSpan = TimeSpan.FromHours(Math.Max(1, config.AuthOptions.ExpireHours));
-            options.SlidingExpiration = config.AuthOptions.SlidingExpiration;
-            options.Events = new CookieAuthenticationEvents
+            options.Events = new JwtBearerEvents
             {
-                OnValidatePrincipal = async context =>
+                OnTokenValidated = async context =>
                 {
-                    var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                    var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
+                        ?? context.Principal?.FindFirstValue("sub")
+                        ?? context.Principal?.FindFirstValue("userId");
                     if (!int.TryParse(userIdValue, out var userId))
                     {
-                        context.RejectPrincipal();
-                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        context.Fail("Invalid token subject.");
                         return;
                     }
 
@@ -92,19 +89,8 @@ try
 
                     if (!userIsActive)
                     {
-                        context.RejectPrincipal();
-                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        context.Fail("User is inactive.");
                     }
-                },
-                OnRedirectToLogin = context =>
-                {
-                    context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
-                    return Task.CompletedTask;
-                },
-                OnRedirectToAccessDenied = context =>
-                {
-                    context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-                    return Task.CompletedTask;
                 }
             };
         });
@@ -127,6 +113,28 @@ try
         {
             Type = "string",
             Example = new OpenApiString("00:00:00")
+        });
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Enter a JWT bearer token."
+        });
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            [
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                }
+            ] = Array.Empty<string>()
         });
     });
 

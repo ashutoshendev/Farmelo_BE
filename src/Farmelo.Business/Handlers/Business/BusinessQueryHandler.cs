@@ -184,7 +184,8 @@ public sealed class BusinessQueryHandler :
                 (SELECT COUNT(1) FROM B2BOrders o LEFT JOIN B2BPayments p ON p.B2BOrderId = o.Id WHERE o.TotalValue > ISNULL(p.PaidAmount, 0)) AS ActiveB2BOrders,
                 (SELECT ISNULL(SUM(o.TotalValue - ISNULL(p.PaidAmount, 0)), 0) FROM B2BOrders o LEFT JOIN B2BPayments p ON p.B2BOrderId = o.Id) AS B2BPending,
                 (SELECT COUNT(DISTINCT a.PartyId) FROM B2CAssignments a LEFT JOIN B2CPayments p ON p.B2CAssignmentId = a.Id WHERE a.TotalValue > ISNULL(p.PaidAmount, 0)) AS ActiveB2CParties,
-                (SELECT ISNULL(SUM(a.TotalValue - ISNULL(p.PaidAmount, 0)), 0) FROM B2CAssignments a LEFT JOIN B2CPayments p ON p.B2CAssignmentId = a.Id) AS B2CPending
+                (SELECT ISNULL(SUM(a.TotalValue - ISNULL(p.PaidAmount, 0)), 0) FROM B2CAssignments a LEFT JOIN B2CPayments p ON p.B2CAssignmentId = a.Id) AS B2CPending,
+                (SELECT ISNULL(SUM(QuantityKg * CostPerKg), 0) FROM RawStockEntries) AS SupplierPayable
             """,
             ct: cancellationToken) ?? new BusinessDashboardDto();
 

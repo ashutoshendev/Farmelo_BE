@@ -1,12 +1,10 @@
 using Farmelo.API.Auditing;
 using Farmelo.API.Controllers.Abstractions;
+using Farmelo.API.Services.Auth;
 using Farmelo.Business.Commands.Auth;
 using Farmelo.Business.Queries.Auth;
-using Farmelo.Shared.Config;
 using Farmelo.Shared.DTO.Auth;
 using MediatR;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -16,18 +14,18 @@ namespace Farmelo.API.Controllers;
 [Route("api/auth")]
 public sealed class AuthController : ApiBaseController<AuthController>
 {
-    private readonly ConfigurationOptions _config;
     private readonly IAuditLogger _auditLogger;
+    private readonly IJwtTokenService _jwtTokenService;
 
     public AuthController(
         ILogger<AuthController> logger,
         IMediator mediator,
-        ConfigurationOptions config,
-        IAuditLogger auditLogger)
+        IAuditLogger auditLogger,
+        IJwtTokenService jwtTokenService)
         : base(logger, mediator)
     {
-        _config = config;
         _auditLogger = auditLogger;
+        _jwtTokenService = jwtTokenService;
     }
 
     [AllowAnonymous]
@@ -46,28 +44,9 @@ public sealed class AuthController : ApiBaseController<AuthController>
         }
 
         var user = result.Payload.User;
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            new(ClaimTypes.Name, user.FullName),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Role, user.Role)
-        };
-
-        var expires = request.RememberMe
-            ? DateTimeOffset.UtcNow.AddDays(Math.Max(1, _config.AuthOptions.RememberMeDays))
-            : DateTimeOffset.UtcNow.AddHours(Math.Max(1, _config.AuthOptions.ExpireHours));
-
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            principal,
-            new AuthenticationProperties
-            {
-                IsPersistent = request.RememberMe,
-                ExpiresUtc = expires
-        });
-        HttpContext.User = principal;
+        var token = _jwtTokenService.CreateToken(user, request.RememberMe);
+        result.Payload.AccessToken = token.AccessToken;
+        result.Payload.ExpiresAtUtc = token.ExpiresAtUtc;
 
         _auditLogger.LogAuthenticationEvent("LOGIN", user.Id, user.FullName);
 
@@ -76,7 +55,7 @@ public sealed class AuthController : ApiBaseController<AuthController>
 
     [Authorize]
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public IActionResult Logout()
     {
         var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId)
             ? parsedUserId
@@ -85,7 +64,6 @@ public sealed class AuthController : ApiBaseController<AuthController>
 
         _auditLogger.LogAuthenticationEvent("LOGOUT", userId, userName);
 
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return NoContent();
     }
 

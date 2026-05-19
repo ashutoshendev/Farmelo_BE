@@ -12,6 +12,8 @@ public class ConfigurationOptions
     public FileStorageOptions FileStorage { get; set; } = new();
     public InvoiceOptions Invoices { get; set; } = new();
     public EmailOptions Email { get; set; } = new();
+    public WhatsAppOptions WhatsApp { get; set; } = new();
+    public NotificationOptions Notifications { get; set; } = new();
 }
 
 public class ConnectionStrings
@@ -47,12 +49,11 @@ public class AuditLogs
 
 public class AuthOptions
 {
-    public string CookieName { get; set; } = "Farmelo.Auth";
     public int ExpireHours { get; set; } = 8;
     public int RememberMeDays { get; set; } = 7;
-    public bool SlidingExpiration { get; set; } = true;
-    public string SameSite { get; set; } = "Lax";
-    public bool RequireHttps { get; set; }
+    public string JwtIssuer { get; set; } = "Farmelo";
+    public string JwtAudience { get; set; } = "Farmelo.Client";
+    public string JwtSigningKey { get; set; } = string.Empty;
 }
 
 public class FileStorageOptions
@@ -79,6 +80,24 @@ public class EmailOptions
     public string Password { get; set; } = string.Empty;
     public string FromEmail { get; set; } = string.Empty;
     public string FromName { get; set; } = "Kaj International";
+}
+
+public class WhatsAppOptions
+{
+    public bool Enabled { get; set; }
+    public string GraphApiBaseUrl { get; set; } = "https://graph.facebook.com";
+    public string ApiVersion { get; set; } = "v24.0";
+    public string PhoneNumberId { get; set; } = string.Empty;
+    public string AccessToken { get; set; } = string.Empty;
+    public string DefaultCountryCode { get; set; } = "91";
+    public bool SendToPartyPhone { get; set; } = true;
+    public string[] Recipients { get; set; } = Array.Empty<string>();
+}
+
+public class NotificationOptions
+{
+    public string[] EmailRecipients { get; set; } = Array.Empty<string>();
+    public string[] WhatsAppRecipients { get; set; } = Array.Empty<string>();
 }
 
 public class SystemApi : BaseApiSettings
