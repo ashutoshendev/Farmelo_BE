@@ -6,6 +6,7 @@ public static class AppConstants
     {
         public const string Admin = "Admin";
         public const string Owner = "Owner";
+        public const string User = "User";
     }
 
     public static class ApiHeaders

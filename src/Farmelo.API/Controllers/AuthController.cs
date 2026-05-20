@@ -53,6 +53,47 @@ public sealed class AuthController : ApiBaseController<AuthController>
         return Ok(result);
     }
 
+    [AllowAnonymous]
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterRequestDto? request, CancellationToken ct)
+    {
+        if (request == null)
+        {
+            return MissingBodyResult<LoginResponseDto>();
+        }
+
+        var result = await Mediator.Send(new RegisterCommand(request), ct);
+        if (!result.Success || result.Payload == null)
+        {
+            return BadRequest(result);
+        }
+
+        var user = result.Payload.User;
+        var token = _jwtTokenService.CreateToken(user, rememberMe: true);
+        result.Payload.AccessToken = token.AccessToken;
+        result.Payload.ExpiresAtUtc = token.ExpiresAtUtc;
+
+        _auditLogger.LogAuthenticationEvent("REGISTER", user.Id, user.FullName);
+
+        return Ok(result);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    public IActionResult ForgotPassword([FromBody] ForgotPasswordRequestDto? request)
+    {
+        if (request == null)
+        {
+            return BadRequest("Request body is required.");
+        }
+
+        // TODO: Add persistent reset-token storage and SMTP email delivery before enabling real password reset links.
+        return Ok(new
+        {
+            message = "If this email exists, password reset instructions will be sent."
+        });
+    }
+
     [Authorize]
     [HttpPost("logout")]
     public IActionResult Logout()
