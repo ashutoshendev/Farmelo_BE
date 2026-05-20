@@ -14,6 +14,7 @@ public class ConfigurationOptions
     public EmailOptions Email { get; set; } = new();
     public WhatsAppOptions WhatsApp { get; set; } = new();
     public NotificationOptions Notifications { get; set; } = new();
+    public PaymentOptions Payments { get; set; } = new();
 }
 
 public class ConnectionStrings
@@ -98,6 +99,13 @@ public class NotificationOptions
 {
     public string[] EmailRecipients { get; set; } = Array.Empty<string>();
     public string[] WhatsAppRecipients { get; set; } = Array.Empty<string>();
+}
+
+public class PaymentOptions
+{
+    public string UpiPayeeAddress { get; set; } = string.Empty;
+    public string UpiPayeeName { get; set; } = "Farmelo";
+    public string UpiProvider { get; set; } = "UPI";
 }
 
 public class SystemApi : BaseApiSettings

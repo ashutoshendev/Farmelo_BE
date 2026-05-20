@@ -36,6 +36,9 @@ public partial class FarmeloDbContext : DbContext
     public DbSet<B2BOrder> B2BOrders => Set<B2BOrder>();
     public DbSet<B2CAssignment> B2CAssignments => Set<B2CAssignment>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<CustomerOrder> CustomerOrders => Set<CustomerOrder>();
+    public DbSet<CustomerOrderItem> CustomerOrderItems => Set<CustomerOrderItem>();
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -53,8 +56,82 @@ public partial class FarmeloDbContext : DbContext
         ConfigureAuditLogs(modelBuilder);
         ConfigureApiLogs(modelBuilder);
         ConfigureBusinessManagement(modelBuilder);
+        ConfigureCustomerOrders(modelBuilder);
         SeedProducts(modelBuilder);
         OnModelCreatingPartial(modelBuilder);
+    }
+
+    private static void ConfigureCustomerOrders(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CustomerOrder>(entity =>
+        {
+            entity.ToTable("CustomerOrders");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.OrderNumber).IsUnique();
+            entity.HasIndex(x => new { x.UserAccountId, x.OrderDate });
+            entity.HasIndex(x => new { x.Status, x.PaymentStatus, x.OrderDate });
+            entity.Property(x => x.OrderNumber).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.PaymentStatus).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.PaymentMethod).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.CustomerName).HasMaxLength(180).IsRequired();
+            entity.Property(x => x.Phone).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.AddressLine).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.City).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Pincode).HasMaxLength(12).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(500);
+            entity.Property(x => x.SubtotalAmount).HasPrecision(14, 2);
+            entity.Property(x => x.DiscountAmount).HasPrecision(14, 2);
+            entity.Property(x => x.TaxAmount).HasPrecision(14, 2);
+            entity.Property(x => x.DeliveryAmount).HasPrecision(14, 2);
+            entity.Property(x => x.TotalAmount).HasPrecision(14, 2);
+            entity.Property(x => x.CreatedBy).HasMaxLength(100);
+            entity.Property(x => x.ModifiedBy).HasMaxLength(100);
+            entity.HasOne(x => x.UserAccount)
+                .WithMany()
+                .HasForeignKey(x => x.UserAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CustomerOrderItem>(entity =>
+        {
+            entity.ToTable("CustomerOrderItems");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.CustomerOrderId);
+            entity.Property(x => x.ProductSlug).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.ProductName).HasMaxLength(180).IsRequired();
+            entity.Property(x => x.Weight).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.UnitPrice).HasPrecision(14, 2);
+            entity.Property(x => x.LineTotal).HasPrecision(14, 2);
+            entity.Property(x => x.CreatedBy).HasMaxLength(100);
+            entity.Property(x => x.ModifiedBy).HasMaxLength(100);
+            entity.HasOne(x => x.CustomerOrder)
+                .WithMany(x => x.Items)
+                .HasForeignKey(x => x.CustomerOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PaymentTransaction>(entity =>
+        {
+            entity.ToTable("PaymentTransactions");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.CustomerOrderId, x.CreatedOnUtc });
+            entity.HasIndex(x => x.TransactionId);
+            entity.Property(x => x.PaymentMethod).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(14, 2);
+            entity.Property(x => x.TransactionId).HasMaxLength(120);
+            entity.Property(x => x.ReferenceId).HasMaxLength(120);
+            entity.Property(x => x.Provider).HasMaxLength(80);
+            entity.Property(x => x.ProviderResponse).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(100);
+            entity.Property(x => x.ModifiedBy).HasMaxLength(100);
+            entity.HasOne(x => x.CustomerOrder)
+                .WithMany(x => x.PaymentTransactions)
+                .HasForeignKey(x => x.CustomerOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     private static void ConfigureBusinessManagement(ModelBuilder modelBuilder)
